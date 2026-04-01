@@ -27,6 +27,17 @@
 
 std::map<std::string_view, std::function<void(const std::vector<std::string_view>)>> commands;
 
+std::string toLower(const std::string& s)
+{
+    std::string result = s;
+
+    std::transform(result.begin(), result.end(), result.begin(), [](unsigned char c) {
+        return std::tolower(c);
+    });
+
+    return result;
+}
+
 void add(std::string_view flag, std::function<void(const std::vector<std::string_view>)> args)
 {
     commands[flag] = std::move(args);
@@ -59,6 +70,22 @@ void parse(int argc, char** argv)
 #pragma endregion
 
 #pragma region JB_RESET
+
+std::vector<std::string> JETBRAINS_PRODUCT = 
+{
+    "IntelliJIdea",
+    "PyCharm",
+    "WebStorm",
+    "PhpStorm",
+    "CLion",
+    "GoLand",
+    "Rider",
+    "DataGrip",
+    "RubyMine",
+    "RustRover",
+    "AndroidStudio",
+    "Fleet",
+};
 
 std::string home()
 {
@@ -161,6 +188,10 @@ void reset(const std::filesystem::path& product)
             out << cleaned;
 
             std::cout << "[" << GREEN "+" << RESET << "] Patched " << GREEN << "other.xml" << RESET << std::endl;
+        }
+        else
+        {
+            std::cout << GREEN << product.filename() << RESET << " is already patched!" << std::endl;
         }
     }
 }
@@ -271,12 +302,39 @@ int main(int argc, char** argv)
         }
         else
         {
-            std::filesystem::path target = base / args[0];
+            std::string target = toLower(std::string(args[0]));
+            bool found = false;
 
-            if (std::filesystem::exists(target))
+            auto it = std::find_if(JETBRAINS_PRODUCT.begin(), JETBRAINS_PRODUCT.end(), [&](const std::string& product) {
+                return toLower(product) == target;
+            });
+
+            if (it != JETBRAINS_PRODUCT.end())
             {
-                reset(target);
-                purge();
+                for (const auto& entry : std::filesystem::directory_iterator(base))
+                {
+                    if (!entry.is_directory())
+                    {
+                        continue;
+                    }
+
+                    std::string name = toLower(entry.path().filename().string());
+
+                    if (name.find(target) == 0)
+                    {
+                        reset(entry.path());
+                        found = true;
+                    }
+                }
+
+                if (found)
+                {
+                    purge();
+                }
+            }
+            else
+            {
+                std::cerr << "[" << RED << "-" << RESET << "] No product found matching: " << YELLOW << target << RESET << std::endl;
             }
         }
     });
