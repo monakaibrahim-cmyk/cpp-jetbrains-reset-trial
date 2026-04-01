@@ -46,5 +46,5 @@ Run the binary from the terminal using the following flags
 3. Global Purge: Deletes the `~/.java/.userPrefs/jetbrains` directory to clear registry-like keys.
 
 # Disclaimer
-[!WARNING]
-This tool is for educational and personal development purposes only. Please support the developers at JetBrains by purchasing a formal license for professional use.
+> [!WARNING]
+> This tool is for educational and personal development purposes only. Please support the developers at JetBrains by purchasing a formal license for professional use.
