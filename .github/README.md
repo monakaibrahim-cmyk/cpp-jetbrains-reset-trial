@@ -1,6 +1,7 @@
 # JetBrains Trial Resetter
 
-![Build Status](https://github.com/monakaibrahim-cmyk/cpp-jetbrains-reset-trial/actions/workflows/build.yml/badge.svg)
+![Linux Build Status](https://github.com/monakaibrahim-cmyk/cpp-jetbrains-reset-trial/actions/workflows/linux.yml/badge.svg)
+![Windows Build Status](https://github.com/monakaibrahim-cmyk/cpp-jetbrains-reset-trial/actions/workflows/windows.yml/badge.svg)
 
 A lightweight C++ utility designed to manage and reset evaluation periods for JetBrains IDEs on Linux. It cleans up local configuration files and global Java user preferences to allow for a fresh environment.
 

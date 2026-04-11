@@ -29,10 +29,32 @@ target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
     -g
 )
 
-target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
-    -rdynamic
+target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
+    $<$<CONFIG:Debug>:DEBUG>
 )
 
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
+    target_link_options(${CMAKE_PROJECT_NAME} PRIVATE
+        -rdynamic
+    )
+endif()
+
 target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
+    $<$<CONFIG:Release,RelWithDebInfo>:-static>
     stdc++exp
 )
+
+# For Debug
+if(MINGW AND CMAKE_BUILD_TYPE STREQUAL "Debug")
+    get_filename_component(MINGW_BIN "${CMAKE_CXX_COMPILER}" DIRECTORY)
+
+    add_custom_command(TARGET ${CMAKE_PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${MINGW_BIN}/libstdc++-6.dll"
+        "${MINGW_BIN}/libgcc_s_seh-1.dll"
+        "${MINGW_BIN}/libwinpthread-1.dll"
+        $<TARGET_FILE_DIR:${CMAKE_PROJECT_NAME}>
+        COMMENT "Copying MinGW runtime DLLs (Debug)"
+        VERBATIM
+    )
+endif()
