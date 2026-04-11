@@ -25,12 +25,16 @@ target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     ${SRC_DIR}
 )
 
-target_compile_options(${CMAKE_PROJECT_NAME} PRIVATE
-    -g
-)
+if (WIN32)
+    target_link_libraries(${PROJECT_NAME} PRIVATE kernel32)
+endif ()
 
 target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
     $<$<CONFIG:Debug>:DEBUG>
+)
+
+target_compile_options(${PROJECT_NAME} PRIVATE
+        $<$<CONFIG:Debug>:-O0 -g>
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
@@ -39,10 +43,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
     )
 endif()
 
-target_link_libraries(${CMAKE_PROJECT_NAME} PRIVATE
-    $<$<CONFIG:Release,RelWithDebInfo>:-static>
-    stdc++exp
-)
+if (MINGW)
+    target_link_options(${PROJECT_NAME} PRIVATE
+            $<$<CONFIG:Release>:-static>
+            $<$<CONFIG:RelWithDebInfo>:-static>
+    )
+endif ()
 
 # For Debug
 if(MINGW AND CMAKE_BUILD_TYPE STREQUAL "Debug")
