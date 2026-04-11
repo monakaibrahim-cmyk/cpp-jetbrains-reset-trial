@@ -103,7 +103,9 @@ const std::vector<std::string> JETBRAINS_PRODUCT =
 const std::vector<std::string> JETBRAINS_IDS_FILE =
 {
     "PermanentDeviceId",
-    "PermanentUserId"
+    "PermanentUserId",
+    "bl",
+    "crl"
 };
 
 const std::vector<std::string> JETBRAINS_REGISTRY_PATH =
@@ -368,6 +370,34 @@ int main(const int argc, char** argv)
 #else
     std::filesystem::path base = std::filesystem::path(home()) / ".config" / "JetBrains";
 #endif
+
+    // Todo: create a check if the JetBrains product are running in the background or on task.
+    {
+#ifdef _WIN32
+        std::vector<std::string> JETBRAINS_TARGET_EXECUTABLES =
+        {
+            "idea64.exe",
+            "pycharm64.exe",
+            "webstorm64.exe",
+            "phpstorm64.exe",
+            "rider64.exe",
+            "datagrip64.exe",
+            "clion64.exe",
+            "goland64.exe",
+            "rubymine64.exe",
+            "idea.exe",
+            "pycharm.exe",
+            "webstorm.exe",
+            "phpstorm.exe",
+            "rider.exe",
+            "datagrip.exe",
+            "clion.exe",
+            "goland.exe",
+            "rubymine.exe"
+        };
+#endif
+        // code here
+    }
 
     add("-h", [](const auto& args) {
         std::cout << "Usage: jb-reset [options]\n-s: Show status\n-r <name|--all/all>: Reset trial\n-h: Help" << std::endl;
