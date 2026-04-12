@@ -10,20 +10,34 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        preset: [ linux-debug, linux-release ]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install Dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake
+          sudo apt-get install -y build-essential cmake git curl zip unzip tar pkg-config
 
-      - name: Configure CMake
+      - name: Setup vcpkg
         run: |
-          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          git clone https://github.com/microsoft/vcpkg.git ${{ github.workspace }}/vcpkg
+          ${{ github.workspace }}/vcpkg/bootstrap-vcpkg.sh
+
+      - name: Configure CMake (preset)
+        run: |
+          cmake --preset ${{ matrix.preset }}
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg
 
       - name: Build
-        run: cmake --build build --config Release
+        run: |
+          cmake --build --preset ${{ matrix.preset }} --parallel
+        env:
+          VCPKG_ROOT: ${{ github.workspace }}/vcpkg

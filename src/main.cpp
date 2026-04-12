@@ -49,7 +49,7 @@ std::vector<List> extract(const std::string &string) {
 
         const auto &download = latest["downloads"];
 
-        if (!download.contains("linux")) {
+        if (!download.contains("linux") || !download.contains("windows")) {
             continue;
         }
 

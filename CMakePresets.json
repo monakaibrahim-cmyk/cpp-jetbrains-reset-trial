@@ -5,39 +5,45 @@
       "name": "linux-debug",
       "displayName": "Linux Debug (Makefiles + GCC + vcpkg)",
       "generator": "Unix Makefiles",
-      "binaryDir": "build",
+      "binaryDir": "build/Debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "/usr/bin/gcc",
         "CMAKE_CXX_COMPILER": "/usr/bin/g++",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-      },
-      "environment": {
-        "VCPKG_ROOT": "/home/development/vcpkg"
       }
     },
     {
       "name": "linux-release",
       "displayName": "Linux Release (Makefiles + GCC + vcpkg)",
       "generator": "Unix Makefiles",
-      "binaryDir": "build",
+      "binaryDir": "build/Release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "/usr/bin/gcc",
         "CMAKE_CXX_COMPILER": "/usr/bin/g++",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
-      },
-      "environment": {
-        "VCPKG_ROOT": "/home/development/vcpkg"
       }
     },
     {
       "name": "windows-msvc-debug",
       "displayName": "Windows Debug (MSVC + vcpkg)",
-      "generator": "Ninja",
-      "binaryDir": "build/windows-debug",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "build/windows-msvc-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      }
+    },
+    {
+      "name": "windows-msvc-release",
+      "displayName": "Windows Release (MSVC + vcpkg)",
+      "generator": "Visual Studio 17 2022",
+      "architecture": "x64",
+      "binaryDir": "build/windows-msvc-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       }
     },
@@ -52,6 +58,18 @@
         "CMAKE_CXX_COMPILER": "g++",
         "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       }
+    },
+    {
+      "name": "windows-mingw-release",
+      "displayName": "Windows Release (MinGW + vcpkg)",
+      "generator": "Ninja",
+      "binaryDir": "build/windows-mingw-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+      }
     }
   ],
   "buildPresets": [
@@ -60,12 +78,24 @@
       "configurePreset": "linux-debug"
     },
     {
+      "name": "linux-release",
+      "configurePreset": "linux-release"
+    },
+    {
       "name": "windows-msvc-debug",
       "configurePreset": "windows-msvc-debug"
     },
     {
+      "name": "windows-msvc-release",
+      "configurePreset": "windows-msvc-release"
+    },
+    {
       "name": "windows-mingw-debug",
       "configurePreset": "windows-mingw-debug"
+    },
+    {
+      "name": "windows-mingw-release",
+      "configurePreset": "windows-mingw-release"
     }
   ]
 }
