@@ -34,18 +34,30 @@ jobs:
             mingw-w64-x86_64-ninja
             git
 
+      - name: Verify tools
+        if: matrix.toolchain == 'mingw'
+        shell: msys2 {0}
+        run: |
+          which cmake
+          which ninja
+          which gcc
+
       - name: Configure (MinGW)
         if: matrix.toolchain == 'mingw'
         shell: msys2 {0}
         run: |
+          export PATH=/mingw64/bin:$PATH
           cmake -B build -G Ninja \
             -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake
+            -DCMAKE_TOOLCHAIN_FILE=$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake \
+            -DVCPKG_TARGET_TRIPLET=x64-mingw-static
 
       - name: Build (MinGW)
         if: matrix.toolchain == 'mingw'
         shell: msys2 {0}
-        run: cmake --build build --parallel
+        run: |
+          export PATH=/mingw64/bin:$PATH
+          cmake --build build --parallel
 
       - name: Setup MSVC
         if: matrix.toolchain == 'msvc'
