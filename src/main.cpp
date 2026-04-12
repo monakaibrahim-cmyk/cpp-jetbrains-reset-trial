@@ -267,7 +267,6 @@ void list(const std::filesystem::path &base) {
 #pragma endregion
 
 int main(const int argc, char **argv) {
-#ifdef _WIN32
     if (const auto running = running_products(JETBRAINS_TARGET_EXECUTABLES); !running.empty()) {
         std::cout << "Please Close the Following Processes Before Continuing." << std::endl << std::endl;
 
@@ -277,9 +276,6 @@ int main(const int argc, char **argv) {
 
         return EXIT_FAILURE;
     }
-#else
-    // Todo: add Linux checking for instance
-#endif
 
 #ifdef _WIN32
     std::filesystem::path base = std::filesystem::path(home()) / "JetBrains";
@@ -299,11 +295,16 @@ int main(const int argc, char **argv) {
         std::cout << "JetBrains Path: " << base.string() << std::endl;
 
         for (const auto &entry: std::filesystem::directory_iterator(base)) {
-            if (entry.is_directory() && entry.path().filename() != "consentOptions") {
+#ifdef __linux__
+            if (entry.is_directory()) {
+#else
+                if (entry.is_directory() && entry.path().filename() != "consentOptions") {
+#endif
                 std::cout << "Products: " << entry.path().filename().string() << std::endl;
             }
         }
 
+#ifdef _WIN32
         for (const std::filesystem::path path = std::filesystem::path(home()) / "JetBrains"; const auto &entry:
              std::filesystem::recursive_directory_iterator(path)) {
             if (entry.is_regular_file()) {
@@ -327,6 +328,7 @@ int main(const int argc, char **argv) {
                 RegCloseKey(key);
             }
         }
+#endif
     });
 #endif
 
