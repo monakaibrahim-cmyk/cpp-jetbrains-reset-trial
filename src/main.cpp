@@ -1,23 +1,87 @@
 #include <cmath>
+#include <curl/curl.h>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <nlohmann/json.hpp>
 #include <optional>
 #include <sstream>
 
 #include "stdafx.h"
 
-#define BLACK   "\033[30m"
-#define RED     "\033[31m"
-#define GREEN   "\033[32m"
-#define YELLOW  "\033[33m"
-#define BLUE    "\033[34m"
-#define MAGENTA "\033[35m"
-#define CYAN    "\033[36m"
-#define WHITE   "\033[37m"
-#define RESET   "\033[0m"
+#pragma region DOWNLOADER
+
+size_t WRITE_CALL_BACK(void *contents, const size_t size, const size_t nmemb, std::string *out) {
+    out->append(static_cast<char *>(contents), size * nmemb);
+    return size * nmemb;
+}
+
+std::string http(const std::string &url) {
+    CURL *curl = curl_easy_init();
+    std::string response;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WRITE_CALL_BACK);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+
+    curl_easy_perform(curl);
+    curl_easy_cleanup(curl);
+
+    return response;
+}
+
+std::vector<List> extract(const std::string &string) {
+    using json = nlohmann::json;
+    std::vector<List> lists;
+
+    for (auto data = json::parse(string); auto &[code, releases]: data.items()) {
+        if (!releases.is_array() || releases.empty()) {
+            continue;
+        }
+
+        const json &latest = releases[0];
+
+        if (!latest.contains("downloads")) {
+            continue;
+        }
+
+        const auto &download = latest["downloads"];
+
+        if (!download.contains("linux")) {
+            continue;
+        }
+
+        List item;
+        item.product = get_product_name(code);
+        item.code = code;
+        item.version = latest.value("version", "unknown");
+        item.build = latest.value("build", "unknown");
+        item.date = latest.value("date", "unknown");
+
+#ifdef __linux__
+        Download linux;
+        linux.link = download["linux"].value("link", "");
+        linux.size = download["linux"].value("size", 0LL);
+        linux.checksum = download["linux"].value("checksum", "");
+
+        item.downloads["linux"] = linux;
+#elif _WIN32
+        Download windows;
+        windows.link = download["windows"].value("link", "");
+        windows.size = download["windows"].value("size", 0LL);
+        windows.checksum = download["windows"].value("checksum", "");
+
+        item.downloads["windows"] = windows;
+#endif
+        lists.push_back(std::move(item));
+    }
+
+    return lists;
+}
+
+#pragma endregion
 
 #pragma region COMMAND_PARSER
 
@@ -114,8 +178,8 @@ std::string clean(const std::string &content) {
         const bool val =
                 (trimmed.find("evlsprt") != std::string_view::npos) ||
                 (trimmed.find("trial.state") != std::string_view::npos) ||
-                (trimmed.find("trial.") != std::string_view::npos && trimmed.find("availability") !=
-                 std::string_view::npos);
+                (trimmed.find("trial.") != std::string_view::npos &&
+                 trimmed.find("availability") != std::string_view::npos);
 
         if (val) {
             skip = true;
@@ -173,7 +237,6 @@ void reset(const std::filesystem::path &product) {
 }
 
 void purge() {
-#ifdef _WIN32
     for (const std::filesystem::path path = std::filesystem::path(home()) / "JetBrains"; const auto &entry:
          std::filesystem::recursive_directory_iterator(path)) {
         if (entry.is_regular_file()) {
@@ -188,6 +251,7 @@ void purge() {
         }
     }
 
+#ifdef _WIN32
     std::cout << "[" << YELLOW << "*" << RESET << "] Purging Registry Keys." << std::endl;
 
     for (const auto &target: JETBRAINS_REGISTRY_PATH) {
@@ -267,6 +331,7 @@ void list(const std::filesystem::path &base) {
 #pragma endregion
 
 int main(const int argc, char **argv) {
+#ifndef DEBUG
     if (const auto running = running_products(JETBRAINS_TARGET_EXECUTABLES); !running.empty()) {
         std::cout << "Please Close the Following Processes Before Continuing." << std::endl << std::endl;
 
@@ -276,6 +341,7 @@ int main(const int argc, char **argv) {
 
         return EXIT_FAILURE;
     }
+#endif
 
 #ifdef _WIN32
     std::filesystem::path base = std::filesystem::path(home()) / "JetBrains";
@@ -334,6 +400,43 @@ int main(const int argc, char **argv) {
 
     add("-s", [&base](const auto &args) {
         list(base);
+    });
+
+    add("-l", [&](const auto &args) {
+        if (args[0] == "--online") {
+            const std::string response = http(
+                "https://data.services.jetbrains.com/products/releases?code=IIU,PCP,WS,PS,CL,GO,RD,DG,RM,RR,AS,FL&latest=true&type=release");
+
+            if (response.empty()) {
+                std::cerr << "Failed to Fetch Data." << std::endl;
+            }
+
+            const auto list = extract(response);
+
+            std::cout << "┌────────────────────┬────────┬────────────┬────────────────┬────────────┐" << std::endl;
+            std::cout << "│      Product       │  Code  │   Version  │     Build      │    Date    │" << std::endl;
+            std::cout << "├────────────────────┼────────┼────────────┼────────────────┼────────────┤" << std::endl;
+
+            for (int i = 0; i < list.size(); i++) {
+                const auto &[product, code, version, build, date, downloads] = list[i];
+                auto colored_name = std::string(GREEN) + product + RESET;
+                auto colored_code = std::string(YELLOW) + code + RESET;
+
+                std::cout << "│ "
+                        << padding(colored_name, 23) << " │ "
+                        << padding(colored_code, 11) << " │ "
+                        << padding(version, 10) << " │ "
+                        << padding(build, 14) << " │ "
+                        << padding(date, 10) << " │" << std::endl;
+
+                if (i + 1 != list.size()) {
+                    std::cout << "├────────────────────┼────────┼────────────┼────────────────┼────────────┤" <<
+                            std::endl;
+                }
+            }
+
+            std::cout << "└────────────────────┴────────┴────────────┴────────────────┴────────────┘" << std::endl;
+        }
     });
 
     add("-r", [&](const auto &args) {
