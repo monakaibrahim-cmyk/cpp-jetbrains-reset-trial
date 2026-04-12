@@ -56,7 +56,10 @@
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
-        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_APPLOCAL_DEPS": true,
+        "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic",
+        "VCPKG_HOST_TRIPLET": "x64-mingw-dynamic"
       }
     },
     {
@@ -68,7 +71,48 @@
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_C_COMPILER": "gcc",
         "CMAKE_CXX_COMPILER": "g++",
-        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_APPLOCAL_DEPS": true,
+        "VCPKG_TARGET_TRIPLET": "x64-mingw-static",
+        "VCPKG_HOST_TRIPLET": "x64-mingw-static"
+      }
+    },
+    {
+      "name": "windows-clion-debug",
+      "displayName": "Windows Debug (MinGW + vcpkg)",
+      "generator": "Ninja",
+      "binaryDir": "build/windows-clion-debug",
+      "environment": {
+        "VCPKG_ROOT": "$env{USERPROFILE}/.vcpkg-clion/vcpkg"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_MAKE_PROGRAM": "C:/Program Files/JetBrains/CLion 2026.1/bin/ninja/win/x64/ninja.exe",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_APPLOCAL_DEPS": true,
+        "VCPKG_TARGET_TRIPLET": "x64-mingw-dynamic",
+        "VCPKG_HOST_TRIPLET": "x64-mingw-dynamic"
+      }
+    },
+    {
+      "name": "windows-clion-release",
+      "displayName": "Windows release (MinGW + vcpkg)",
+      "generator": "Ninja",
+      "binaryDir": "build/windows-clion-release",
+      "environment": {
+        "VCPKG_ROOT": "$env{USERPROFILE}/.vcpkg-clion/vcpkg"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_COMPILER": "gcc",
+        "CMAKE_CXX_COMPILER": "g++",
+        "CMAKE_MAKE_PROGRAM": "C:/Program Files/JetBrains/CLion 2026.1/bin/ninja/win/x64/ninja.exe",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_APPLOCAL_DEPS": true,
+        "VCPKG_TARGET_TRIPLET": "x64-mingw-static",
+        "VCPKG_HOST_TRIPLET": "x64-mingw-static"
       }
     }
   ],
@@ -96,6 +140,14 @@
     {
       "name": "windows-mingw-release",
       "configurePreset": "windows-mingw-release"
+    },
+    {
+      "name": "windows-clion-debug",
+      "configurePreset": "windows-clion-debug"
+    },
+    {
+      "name": "windows-clion-release",
+      "configurePreset": "windows-clion-release"
     }
   ]
 }

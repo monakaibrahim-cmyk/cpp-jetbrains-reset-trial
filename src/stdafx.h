@@ -35,6 +35,11 @@ struct List {
     std::map<std::string, Download> downloads;
 };
 
+struct ProgressData {
+    std::string product;
+    std::chrono::steady_clock::time_point start_time;
+};
+
 #ifdef _WIN32
 #include <shlobj.h>
 #include <tlhelp32.h>
@@ -45,6 +50,8 @@ inline constexpr std::array<std::string_view, 2> JETBRAINS_REGISTRY_PATH =
     "Software\\JavaSoft",
     "Software\\JetBrains"
 };
+#else
+#include <termios.h>
 #endif
 
 inline const std::vector<std::string> JETBRAINS_IDS_FILE =
@@ -146,6 +153,47 @@ inline std::string toLower(const std::string &s) {
     return result;
 }
 
+inline std::string format(double bytes, bool is_speed = false) {
+    const char *units[] = {"B", "KB", "MB", "GB", "TB"};
+    int index = 0;
+
+    while (bytes >= 1024.0 && index < 4) {
+        bytes /= 1024.0;
+        index++;
+    }
+
+    std::stringstream stream;
+    stream << std::fixed << std::setprecision(1) << bytes << " " << units[index];
+
+    if (is_speed) {
+        stream << "/s";
+    }
+
+    return stream.str();
+}
+
+inline std::string progress_bar(const int width, const double percentage) {
+    static constexpr std::string blocks[] = {" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉", "█"};
+    const double filled = (percentage / 100.0) * width;
+    const int block = static_cast<int>(filled);
+    const int index = static_cast<int>((filled - block) * 8);
+    std::string bar;
+
+    for (int i = 0; i < block; ++i) {
+        bar += "█";
+    }
+
+    if (block < width) {
+        bar += blocks[index];
+
+        for (int i = block + 1; i < width; ++i) {
+            bar += " ";
+        }
+    }
+
+    return bar;
+}
+
 inline std::string get_product_name(const std::string &code) {
     if (const auto it = JETBRAINS_PRODUCT_NAME.find(code); it != JETBRAINS_PRODUCT_NAME.end()) {
         return it->second;
@@ -221,3 +269,51 @@ inline std::vector<std::string> running_products(const std::vector<std::string> 
 
     return products;
 }
+
+#ifdef _WIN32
+inline bool IS_PRODUCT_INSTALLED(const std::string &product) {
+    const std::vector<HKEY> roots = {HKEY_LOCAL_MACHINE, HKEY_CURRENT_USER};
+    const std::string subkey = R"(SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall)";
+
+    for (HKEY hRoot: roots) {
+        HKEY hKey;
+
+        if (RegOpenKeyExA(hRoot, subkey.c_str(), 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+            char buffer[256];
+            DWORD count = 0;
+
+            RegQueryInfoKeyA(hKey, nullptr, nullptr, nullptr, &count, nullptr, nullptr, nullptr, nullptr, nullptr,
+                             nullptr, nullptr);
+
+            for (DWORD i = 0; i < count; i++) {
+                DWORD size = sizeof(buffer);
+
+                if (RegEnumKeyExA(hKey, i, buffer, &size, nullptr, nullptr, nullptr, nullptr) == ERROR_SUCCESS) {
+                    HKEY hSubKey;
+
+                    if (RegOpenKeyExA(hKey, buffer, 0, KEY_READ, &hSubKey) == ERROR_SUCCESS) {
+                        char display_name[256];
+                        DWORD display_size = sizeof(display_name);
+
+                        if (RegQueryValueExA(hSubKey, "DisplayName", nullptr, nullptr,
+                                             reinterpret_cast<LPBYTE>(display_name), &display_size) == ERROR_SUCCESS) {
+                            if (std::string ds = toLower(display_name);
+                                ds.find(toLower(product)) != std::string::npos) {
+                                RegCloseKey(hSubKey);
+                                RegCloseKey(hKey);
+
+                                return true;
+                            }
+                        }
+
+                        RegCloseKey(hSubKey);
+                    }
+                }
+            }
+            RegCloseKey(hKey);
+        }
+    }
+
+    return false;
+}
+#endif

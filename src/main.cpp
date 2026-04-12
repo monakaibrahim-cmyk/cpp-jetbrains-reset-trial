@@ -7,29 +7,110 @@
 #include <map>
 #include <nlohmann/json.hpp>
 #include <optional>
+#include <thread>
 #include <sstream>
 
 #include "stdafx.h"
 
 #pragma region DOWNLOADER
 
-size_t WRITE_CALL_BACK(void *contents, const size_t size, const size_t nmemb, std::string *out) {
+size_t WRITE_CALLBACK(void *contents, const size_t size, const size_t nmemb, std::string *out) {
     out->append(static_cast<char *>(contents), size * nmemb);
+
     return size * nmemb;
 }
 
-std::string http(const std::string &url) {
+size_t WRITE_FILE_CALLBACK(const void *ptr, const size_t size, const size_t nmemb, FILE *stream) {
+    const size_t written = fwrite(ptr, size, nmemb, stream);
+
+    return written;
+}
+
+int PROGRESS_CALLBACK(void *ptr, const curl_off_t dltotal, const curl_off_t dlnow, const curl_off_t ultotal,
+                      const curl_off_t ulnow) {
+    if (dltotal <= 0) {
+        return 0;
+    }
+
+    const auto *data = static_cast<ProgressData *>(ptr);
+    const double percentage = static_cast<double>(dlnow) / static_cast<double>(dltotal) * 100.0;
+    const auto now_time = std::chrono::steady_clock::now();
+    const std::chrono::duration<double> elapsed = now_time - data->start_time;
+    const double bytes_per_sec = (elapsed.count() > 0) ? (static_cast<double>(dlnow) / elapsed.count()) : 0.0;
+    const std::string bar = progress_bar(50, percentage);
+    const std::string current_size = format(static_cast<double>(dlnow));
+    const std::string total_size = format(static_cast<double>(dltotal));
+    const std::string speed_str = format(bytes_per_sec, true);
+
+    std::cout << "\r[" << GREEN << "+" << RESET << "] "
+            << std::left << std::setw(15) << data->product << " "
+            << "[" << CYAN << bar << RESET << "] "
+            << std::fixed << std::setprecision(1) << std::right << std::setw(5)
+            << percentage << "% "
+            << "(" << std::setw(8) << current_size << " / " << std::setw(8) << total_size << ") "
+            << YELLOW << std::setw(10) << speed_str << RESET << "    " << std::flush;
+
+    return 0;
+}
+
+std::string get(const std::string &url) {
     CURL *curl = curl_easy_init();
+
+    if (!curl) {
+        return "";
+    }
+
     std::string response;
 
     curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WRITE_CALL_BACK);
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WRITE_CALLBACK);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
     curl_easy_perform(curl);
     curl_easy_cleanup(curl);
 
     return response;
+}
+
+bool get(const std::string &url, const std::string &path, const std::string &product) {
+    CURL *curl = curl_easy_init();
+
+    if (!curl) {
+        return false;
+    }
+
+    FILE *file = fopen(path.c_str(), "wb");
+
+    if (!file) {
+        curl_easy_cleanup(curl);
+
+        return false;
+    }
+
+    ProgressData p_data{product, std::chrono::steady_clock::now()};
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WRITE_FILE_CALLBACK);
+    curl_easy_setopt(curl, CURLOPT_WRITEDATA, file);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+    curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, PROGRESS_CALLBACK);
+    curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &p_data);
+
+    const CURLcode response = curl_easy_perform(curl);
+
+    fclose(file);
+    curl_easy_cleanup(curl);
+
+    std::cout << std::endl;
+
+    if (response != CURLE_OK) {
+        std::cerr << RED << std::endl << "Download failed: " << curl_easy_strerror(response) << RESET << std::endl;
+        std::filesystem::remove(path);
+        return false;
+    }
+
+    return true;
 }
 
 std::vector<List> extract(const std::string &string) {
@@ -67,7 +148,7 @@ std::vector<List> extract(const std::string &string) {
         linux.checksum = download["linux"].value("checksum", "");
 
         item.downloads["linux"] = linux;
-#elif _WIN32
+#else
         Download windows;
         windows.link = download["windows"].value("link", "");
         windows.size = download["windows"].value("size", 0LL);
@@ -91,21 +172,19 @@ void add(const std::string_view flag, std::function<void(const std::vector<std::
     commands[flag] = std::move(args);
 }
 
+void alias(const std::string_view a, const std::string_view b) {
+    commands[a] = commands[b];
+}
+
 void parse(const int argc, char **argv) {
     for (int i = 1; i < argc; ++i) {
         if (std::string_view arg = argv[i]; commands.contains(arg)) {
             std::vector<std::string_view> params;
-#ifdef VERSION_ONE
-            while (i + 1 < argc && argv[i + 1][0] != '-')
-#else
-            while (i + 1 < argc)
-#endif
-            {
-#ifndef VERSION_ONE
+
+            while (i + 1 < argc) {
                 if (commands.contains(argv[i + 1])) {
                     break;
                 }
-#endif
                 params.emplace_back(argv[++i]);
             }
 
@@ -289,7 +368,7 @@ void list(const std::filesystem::path &base) {
 
     for (const auto &entry: std::filesystem::directory_iterator(base)) {
 #ifdef _WIN32
-        if (!entry.is_directory() || entry.path().filename() == "consentOptions")
+        if (!entry.is_directory() || entry.path().filename() == "consentOptions" || entry.path().filename() == "acp-agents")
 #else
         if (!entry.is_directory())
 #endif
@@ -331,6 +410,32 @@ void list(const std::filesystem::path &base) {
 #pragma endregion
 
 int main(const int argc, char **argv) {
+#ifdef _WIN32
+    SetConsoleOutputCP(CP_UTF8);
+
+    HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
+    DWORD mode;
+    GetConsoleMode(hStdin, &mode);
+    mode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
+    mode |= ENABLE_PROCESSED_INPUT;
+    SetConsoleMode(hStdin, mode);
+    FlushConsoleInputBuffer(hStdin);
+
+    CONSOLE_CURSOR_INFO ci;
+    ci.bVisible = FALSE;
+    ci.dwSize = 1;
+    SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &ci);
+#else
+    static struct termios oldt, newt;
+
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ECHO | ICANON);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+
+    std::cout << "\033[?25l" << std::flush;
+
+#endif
 #ifndef DEBUG
     if (const auto running = running_products(JETBRAINS_TARGET_EXECUTABLES); !running.empty()) {
         std::cout << "Please Close the Following Processes Before Continuing." << std::endl << std::endl;
@@ -349,9 +454,37 @@ int main(const int argc, char **argv) {
     std::filesystem::path base = std::filesystem::path(home()) / ".config" / "JetBrains";
 #endif
 
-    add("-h", [](const auto &args) {
-        std::cout << "Usage: jb-reset [options]\n-s: Show status\n-r <name|--all/all>: Reset trial\n-h: Help" <<
+    add("-h", [&](const auto &args) {
+        constexpr int width = 35;
+
+        std::cout << YELLOW << "Usage: " << WHITE << "jb-reset " << CYAN << "[options]" << RESET << std::endl <<
                 std::endl;
+        std::cout << std::left
+                << std::setw(50) << (GREEN "  COMMAND" RESET)
+                << (GREEN "DESCRIPTION" RESET) << std::endl;
+
+        for (int i = 0; i < 70; ++i) {
+            std::cout << "─";
+        }
+
+        std::cout << std::endl;
+
+        auto print = [&](const std::string &cmd, const std::string &desc) {
+            std::cout << std::left << std::setw(width) << cmd << desc << std::endl;
+        };
+
+        print("  -h, --help", "Show available commands.");
+
+#ifdef DEBUG
+        print("  -t, --test", "Run internal test suite.");
+#endif
+
+        print("  -s, --show", "Show installed products and trial status.");
+        print("  -i, --install <name/code>", "Download and install a JetBrains product.");
+        print("  -l, --list --online", "List local products or fetch online releases.");
+        print("  -r, --reset <name|all>", "Reset the evaluation period for products.");
+
+        std::cout << std::endl << YELLOW << "Example:" << RESET << " jb-reset -i clion" << std::endl;
     });
 
 #ifdef DEBUG
@@ -402,9 +535,127 @@ int main(const int argc, char **argv) {
         list(base);
     });
 
+    add("-i", [&](const auto &args) {
+        if (args.empty()) {
+            std::cerr << "Usage: -i <product>" << std::endl;
+
+            return;
+        }
+
+        const std::string response = get(
+            "https://data.services.jetbrains.com/products/releases?code=IIU,PCP,WS,PS,CL,GO,RD,DG,RM,RR,AS,FL&latest=true&type=release");
+
+        if (response.empty()) {
+            std::cerr << "Failed to Fetch Data." << std::endl;
+
+            return;
+        }
+
+        const auto list = extract(response);
+
+        const std::string target = toLower(std::string(args[0]));
+        bool found = false;
+        std::string url;
+        std::string name;
+
+        for (const auto &[product, code, version, build, date, downloads]: list) {
+            if (toLower(product).find(target) != std::string::npos || toLower(code) == target) {
+                found = true;
+                name = product;
+#ifdef _WIN32
+                if (downloads.contains("windows")) {
+                    url = downloads.at("windows").link;
+                }
+#else
+                if (downloads.contains("linux")) {
+                    url = downloads.at("linux").link;
+                }
+#endif
+
+                break;
+            }
+        }
+
+        if (found && !url.empty()) {
+            const std::string filename = url.substr(url.find_last_of("/\\") + 1);
+#ifdef _WIN32
+            if (!IS_PRODUCT_INSTALLED(name)) {
+#else
+                std::filesystem::path local = std::filesystem::path(home()) / ".local" / "share" / "JetBrains" / name;
+                if (!std::filesystem::exists(local)) {
+#endif
+                if (get(url, filename, name)) {
+#ifdef _WIN32
+                    std::cout << std::endl << "[" << YELLOW << "*" << RESET << "] Launching installer for " << name <<
+                            "." << std::endl;
+
+                    SHELLEXECUTEINFOA shell = {sizeof(shell)};
+                    shell.fMask = SEE_MASK_NOCLOSEPROCESS;
+                    shell.lpVerb = "open";
+                    shell.lpFile = filename.c_str();
+                    shell.nShow = SW_SHOWNORMAL;
+
+                    if (ShellExecuteExA(&shell)) {
+                        std::cout << "[" << YELLOW << "*" << RESET << "] Waiting for installation to complete." <<
+                                std::endl;
+
+                        WaitForSingleObject(shell.hProcess, INFINITE);
+                        CloseHandle(shell.hProcess);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+                        try {
+                            std::filesystem::remove(filename);
+
+                            std::cout << "[" << GREEN << "+" << RESET << "] Installer cleaned up successfully." <<
+                                    std::endl;
+                        } catch (const std::filesystem::filesystem_error &e) {
+                            std::cerr << RED << "[-] Cleanup failed: " << e.what() << RESET << std::endl;
+                            std::cerr << YELLOW << "[!] Manual cleanup required: " << filename << RESET << std::endl;
+                        }
+                    } else {
+                        std::cout << "[" << GREEN << "+" << RESET << "] Installer process started." << std::endl;
+                    }
+#else
+                    std::cout << std::endl << "[" << YELLOW << "*" << RESET << "] Extracting " << filename << "." <<
+                            std::endl;
+
+                    std::filesystem::path path = std::filesystem::path(home()) / ".local" / "share" / "JetBrains";
+                    std::filesystem::create_directories(path);
+                    std::string query = "tar -xzf " + filename + " -C " + path.string() + " --strip-components=1";
+
+                    const int ret = std::system(query.c_str());
+
+                    if (ret == 0) {
+                        std::cout << "[" << GREEN << "+" << RESET << "] Extracted to: " << path << std::endl;
+
+                        try {
+                            std::filesystem::remove(filename);
+
+                            std::cout << "[" << GREEN << "+" << RESET << "] Cleaned up archive." << std::endl;
+                        } catch (const std::filesystem::filesystem_error &e) {
+                            std::cerr << RED << "[-] Cleanup failed: " << e.what() << RESET << std::endl;
+                            std::cerr << YELLOW << "[!] Manual cleanup required: " << filename << RESET << std::endl;
+                        }
+                    }
+                    std::cerr << RED << "[" << RED << "-" << RESET << "] Extraction failed." << RESET <<
+                            std::endl;else {
+                    }
+
+#endif
+                } else {
+                    std::cerr << RED << "Could not save the file." << RESET << std::endl;
+                }
+            } else {
+                std::cerr << name << " is already Installed." << std::endl;
+            }
+        } else if (!found) {
+            std::cerr << "No product found matching: " << target << std::endl;
+        }
+    });
+
     add("-l", [&](const auto &args) {
         if (args[0] == "--online") {
-            const std::string response = http(
+            const std::string response = get(
                 "https://data.services.jetbrains.com/products/releases?code=IIU,PCP,WS,PS,CL,GO,RD,DG,RM,RR,AS,FL&latest=true&type=release");
 
             if (response.empty()) {
@@ -413,7 +664,7 @@ int main(const int argc, char **argv) {
 
             const auto list = extract(response);
 
-            std::cout << "┌────────────────────┬────────┬────────────┬────────────────┬────────────┐" << std::endl;
+            std::cout << "╭────────────────────┬────────┬────────────┬────────────────┬────────────╮" << std::endl;
             std::cout << "│      Product       │  Code  │   Version  │     Build      │    Date    │" << std::endl;
             std::cout << "├────────────────────┼────────┼────────────┼────────────────┼────────────┤" << std::endl;
 
@@ -435,7 +686,7 @@ int main(const int argc, char **argv) {
                 }
             }
 
-            std::cout << "└────────────────────┴────────┴────────────┴────────────────┴────────────┘" << std::endl;
+            std::cout << "╰────────────────────┴────────┴────────────┴────────────────┴────────────╯" << std::endl;
         }
     });
 
@@ -487,6 +738,30 @@ int main(const int argc, char **argv) {
             }
         }
     });
+
+    alias("-help", "-h");
+    alias("--help", "-h");
+    alias("--h", "-h");
+
+    alias("-test", "-t");
+    alias("--test", "-t");
+    alias("--t", "-t");
+
+    alias("-show", "-s");
+    alias("--show", "-s");
+    alias("-s", "-s");
+
+    alias("-install", "-i");
+    alias("--install", "-i");
+    alias("--i", "-i");
+
+    alias("-list", "-l");
+    alias("--list", "-l");
+    alias("--", "-l");
+
+    alias("-reset", "-r");
+    alias("--reset", "-r");
+    alias("--r", "-r");
 
     if (argc == 1) {
         char *temp[] =

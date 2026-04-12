@@ -9,12 +9,14 @@ A lightweight C++ utility designed to manage and reset evaluation periods for Je
 - **Status Overview**: View all installed JetBrains products, their trial status, and days remaining.
 - **Targeted Reset**: Reset the trial for a specific IDE(e.g., `PyCharm2023.2`).
 - **Deep Clean**: Automatically purges global Java user preferences associated with JetBrains.
+- **Install Product**: Installs an installer or archive and automatically remove the file after installation.
 
 ### Prerequisites
 To build this tool, you need:
 - A C++23 compatible compiler (GCC or Clang).
 - Standard C++ Library
 - Cmake
+- VCPKG
 - Linux Environment (uses `HOME` environment variables and `~/.config` paths)
 
 # Build Instructions
@@ -27,19 +29,20 @@ cd cpp-jetbrains-reset-trial
 ### 2. Compile:
 Use the following command to compile the project using GCC:
 ```bash
-cmake -B build
-cmake --build build
+cmake --preset windows-clion-release
+cmake --build --preset windows-clion-release --parallel
 ```
 
 # Usage
 Run the binary from the terminal using the following flags
 
-| Flag | Description |
-| --- | --- |
-| `-h` | Show the help menu. |
-| `-s` | Lists products, status, and days remaining. |
-| `-r <name>` | Resets the trial for the specified product name. |
-| `-r all` | Resets trials for every JetBrains product found. |
+| Flag                             | Description                                   |
+|----------------------------------|-----------------------------------------------|
+| `-h, --help`                     | Show available commands.                      |
+| `-t, --test`                     | Run internal test suite.                      |
+| `-i, --install <name/code>`      | Download and install a JetBrains product.     |
+| `-l, --list --online`            | List local products or fetch online releases. |
+| `-r, --reset <name/(all/--all)>` | Reset the evaluation period for products.     |
 
 # How it Works
 1. File Deletion: Removes the `eval` directory within the IDE's configuration path.

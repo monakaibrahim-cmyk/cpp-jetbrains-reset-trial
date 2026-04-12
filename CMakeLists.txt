@@ -92,6 +92,7 @@ target_compile_definitions(${CMAKE_PROJECT_NAME} PRIVATE
 
 target_compile_options(${PROJECT_NAME} PRIVATE
         $<$<CONFIG:Debug>:-O0 -g>
+        $<$<CXX_COMPILER_ID:MSVC>:/utf-8>
 )
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
@@ -101,6 +102,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" AND NOT WIN32)
 endif()
 
 if (MINGW)
+    target_compile_options(${PROJECT_NAME} PRIVATE
+            $<$<CXX_COMPILER_ID:GNU>:-finput-charset=UTF-8 -fexec-charset=UTF-8>
+    )
     target_link_options(${PROJECT_NAME} PRIVATE
             $<$<CONFIG:Release>:-static>
             $<$<CONFIG:RelWithDebInfo>:-static>
