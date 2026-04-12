@@ -23,7 +23,7 @@ jobs:
         uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64
-          update: true
+          update: false
           install: >
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-cmake
@@ -50,8 +50,7 @@ jobs:
       - name: Configure (MSVC)
         if: matrix.toolchain == 'msvc'
         run: |
-          cmake -B build -G "Visual Studio 17 2022" -A x64 ^
-            -DCMAKE_BUILD_TYPE=Release
+          cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_BUILD_TYPE=Release
 
       - name: Build (MSVC)
         if: matrix.toolchain == 'msvc'
