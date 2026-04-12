@@ -29,8 +29,8 @@ cd cpp-jetbrains-reset-trial
 ### 2. Compile:
 Use the following command to compile the project using GCC:
 ```bash
-cmake --preset windows-clion-release
-cmake --build --preset windows-clion-release --parallel
+cmake --preset linux-release
+cmake --build --preset linux-release --parallel
 ```
 
 # Usage

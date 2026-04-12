@@ -79,7 +79,15 @@ bool get(const std::string &url, const std::string &path, const std::string &pro
         return false;
     }
 
-    FILE *file = fopen(path.c_str(), "wb");
+    FILE *file;
+
+#ifdef _WIN32
+    if (const errno_t err = fopen_s(&file, path.c_str(), "wb"); err != 0) {
+        file = nullptr;
+    }
+#else
+    file = fopen_s(path.c_str(), "wb");
+#endif
 
     if (!file) {
         curl_easy_cleanup(curl);
@@ -636,11 +644,9 @@ int main(const int argc, char **argv) {
                             std::cerr << RED << "[-] Cleanup failed: " << e.what() << RESET << std::endl;
                             std::cerr << YELLOW << "[!] Manual cleanup required: " << filename << RESET << std::endl;
                         }
+                    } else {
+                        std::cerr << RED << "[" << RED << "-" << RESET << "] Extraction failed." << RESET << std::endl;
                     }
-                    std::cerr << RED << "[" << RED << "-" << RESET << "] Extraction failed." << RESET <<
-                            std::endl;else {
-                    }
-
 #endif
                 } else {
                     std::cerr << RED << "Could not save the file." << RESET << std::endl;
