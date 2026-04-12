@@ -86,7 +86,7 @@ bool get(const std::string &url, const std::string &path, const std::string &pro
         file = nullptr;
     }
 #else
-    file = fopen_s(path.c_str(), "wb");
+    file = fopen(path.c_str(), "wb");
 #endif
 
     if (!file) {
