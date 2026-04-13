@@ -312,12 +312,15 @@ void reset(const std::filesystem::path &product) {
         }
     }
 #ifdef _WIN32
-    if (const std::filesystem::path key(product / "clion.key"); std::filesystem::exists(key)) {
-        if (std::filesystem::remove(key)) {
-            std::cout << "[" << GREEN "+" << RESET << "] Removed Trial License Key " << GREEN << key.filename() << RESET
-                    << std::endl;
-        } else {
-            std::cout << GREEN << key.filename() << RESET << " is already deleted!" << std::endl;
+    for (const auto &entry: std::filesystem::directory_iterator(product)) {
+        if (entry.path().extension() == ".key") {
+            if (const std::filesystem::path &key = entry.path(); std::filesystem::remove(key)) {
+                std::cout << "[" << GREEN "+" << RESET << "] Removed Trial License Key " << GREEN << key.filename() <<
+                        RESET
+                        << std::endl;
+            } else {
+                std::cout << GREEN << key.filename() << RESET << " is already deleted!" << std::endl;
+            }
         }
     }
 #endif
@@ -422,17 +425,24 @@ int main(const int argc, char **argv) {
     SetConsoleOutputCP(CP_UTF8);
 
     HANDLE hStdin = GetStdHandle(STD_INPUT_HANDLE);
-    DWORD mode;
-    GetConsoleMode(hStdin, &mode);
-    mode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
-    mode |= ENABLE_PROCESSED_INPUT;
-    SetConsoleMode(hStdin, mode);
+    HANDLE hStdout = GetStdHandle(STD_OUTPUT_HANDLE);
+
+    DWORD oldMode;
+    CONSOLE_CURSOR_INFO oldCursor;
+    GetConsoleMode(hStdin, &oldMode);
+
+    DWORD newMode = oldMode;
+    newMode &= ~(ENABLE_ECHO_INPUT | ENABLE_LINE_INPUT);
+    newMode |= ENABLE_PROCESSED_INPUT;
+    SetConsoleMode(hStdin, newMode);
     FlushConsoleInputBuffer(hStdin);
 
-    CONSOLE_CURSOR_INFO ci;
+    GetConsoleCursorInfo(hStdout, &oldCursor);
+
+    CONSOLE_CURSOR_INFO ci = oldCursor;
     ci.bVisible = FALSE;
     ci.dwSize = 1;
-    SetConsoleCursorInfo(GetStdHandle(STD_OUTPUT_HANDLE), &ci);
+    SetConsoleCursorInfo(hStdout, &ci);
 #else
     static struct termios oldt, newt;
 
@@ -624,12 +634,13 @@ int main(const int argc, char **argv) {
                         std::cout << "[" << GREEN << "+" << RESET << "] Installer process started." << std::endl;
                     }
 #else
-                    std::cout << std::endl << "[" << YELLOW << "*" << RESET << "] Extracting " << filename << "." <<
-                            std::endl;
-
-                    std::filesystem::path path = std::filesystem::path(home()) / ".local" / "share" / "JetBrains";
+                    std::filesystem::path path = std::filesystem::path(home()) / ".local" / "share" / "JetBrains" / name;
                     std::filesystem::create_directories(path);
-                    std::string query = "tar -xzf " + filename + " -C " + path.string() + " --strip-components=1";
+
+                    std::cout << std::endl << "[" << YELLOW << "*" << RESET << "] Extracting " << filename << " to " <<
+                            path.string() << std::endl;
+
+                    std::string query = "tar -xzf " + filename + " -C \"" + path.string() + "\" --strip-components=1";
 
                     const int ret = std::system(query.c_str());
 
@@ -780,6 +791,14 @@ int main(const int argc, char **argv) {
     } else {
         parse(argc, argv);
     }
+
+#ifdef _WIN32
+    SetConsoleMode(hStdin, oldMode);
+    SetConsoleCursorInfo(hStdout, &oldCursor);
+#else
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+    std::cout << "\033[?25h" << std::flush;
+#endif
 
     return EXIT_SUCCESS;
 }

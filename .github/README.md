@@ -20,13 +20,34 @@ To build this tool, you need:
 - Linux Environment (uses `HOME` environment variables and `~/.config` paths)
 
 # Build Instructions
-### 1. Clone:
+
+### 1. Installing VCPKG and other Essential Tools
+
+1. Installing Essential Tools
+
+```bash
+sudo apt-get update && sudo apt-get install -y build-essential cmake git curl zip unzip tar pkg-config
+```
+
+2. Cloning Vcpkg
+
+```bash
+sudo git clone https://github.com/microsoft/vcpkg.git /vcpkg && cd /vcpkg && ./vcpkg/bootstrap-vcpkg.sh
+```
+
+3. Export Vcpkg Root
+
+```bash
+export VCPKG_ROOT=/vcpkg
+```
+
+### 2. Clone:
 ```bash
 git clone https://github.com/monakaibrahim-cmyk/cpp-jetbrains-reset-trial.git
 cd cpp-jetbrains-reset-trial
 ```
 
-### 2. Compile:
+### 3. Compile:
 Use the following command to compile the project using GCC:
 ```bash
 cmake --preset linux-release
